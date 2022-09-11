@@ -1,17 +1,14 @@
-import itertools
-import operator
-from collections import Iterator
-import random
-from . import exceptions
-from . import utils
+from __future__ import annotations
+
+from typing import Any, Iterable, Type, TypeVar
+
 from . import lookups
 
 REPR_OUTPUT_SIZE = 10
 
 
-class Path(object):
-
-    class DoesNotExist(object):
+class Path:
+    class DoesNotExist:
         pass
 
     def __init__(self, path=None):
@@ -58,12 +55,17 @@ class Path(object):
         return QueryNode(path=self, lookup=lookups.registry['test'](func, *args, **kwargs))
 
     def exists(self):
-        return QueryNode(path=self, lookup=lookups.registry['exists'](), path_kwargs={'soft_fail': True})
+        return QueryNode(
+            path=self,
+            lookup=lookups.registry['exists'](),
+            path_kwargs={'soft_fail': True}
+            )
 
     def __hash__(self):
         return hash(tuple(self.path))
 
-class Ordering(object):
+
+class Ordering:
 
     def __init__(self, path, reverse=False, random=False):
         self.path = path
@@ -75,7 +77,8 @@ class Ordering(object):
     def __hash__(self):
         return hash((self.path, self.reverse, self.random))
 
-class Aggregation(object):
+
+class Aggregation:
     def __init__(self, path, func):
         self.path = path
         self.func = func
@@ -92,7 +95,7 @@ class Aggregation(object):
         return self.func(data)
 
 
-class BaseQueryNode(object):
+class BaseQueryNode:
     def __init__(self, *args, **kwargs):
         self.inverted = kwargs.pop('inverted', False)
 
@@ -105,6 +108,7 @@ class BaseQueryNode(object):
     def __invert__(self):
         return self.clone(inverted=not self.inverted)
 
+
 class QueryNodeWrapper(BaseQueryNode):
     def __init__(self, operator, *args, **kwargs):
         super(QueryNodeWrapper, self).__init__(**kwargs)
@@ -116,7 +120,11 @@ class QueryNodeWrapper(BaseQueryNode):
             inverted_repr = 'NOT '
         else:
             inverted_repr = ''
-        return '<QueryNodeWrapper {0}{1} ({2})>'.format(inverted_repr, self.operator, self.operator.join([repr(self.subqueries)]))
+        return '<QueryNodeWrapper {0}{1} ({2})>'.format(
+            inverted_repr,
+            self.operator,
+            self.operator.join([repr(self.subqueries)])
+            )
 
     def __and__(self, other):
         if hasattr(other, 'operator'):
@@ -133,16 +141,19 @@ class QueryNodeWrapper(BaseQueryNode):
         new_query = self.__class__(
             kwargs.get('operator', self.operator),
             *kwargs.get('subqueries', self.subqueries),
-            **kwargs)
+            **kwargs
+        )
         return new_query
 
     def __hash__(self):
         return hash((self.inverted, self.operator, tuple(self.subqueries)))
 
+
 class QueryNode(BaseQueryNode):
-    """An abstract way to represent query, that will be compiled to an actual query by the manager"""
-    def __init__(self, path, lookup, path_kwargs={}, **kwargs):
-        self.path_kwargs = path_kwargs
+    """An abstract way to represent query, compiled to an actual query by the manager"""
+
+    def __init__(self, path, lookup, path_kwargs: dict | None = None, **kwargs):
+        self.path_kwargs = path_kwargs if path_kwargs is not None else {}
         super(QueryNode, self).__init__(**kwargs)
         self.path = path
         self.lookup = lookup
@@ -164,17 +175,20 @@ class QueryNode(BaseQueryNode):
             self.lookup,
             self.inverted,
         ))
-def lookup_to_path(lookup):
+
+
+def lookup_to_path(lookup: str) -> Path:
     path = Path()
     for part in lookup.replace('__', '.').split('.'):
         path = getattr(path, part)
     return path
 
 
-class Window(object):
+class Window:
     """Used to help dealing with sliced querysets"""
+    __slots__ = ('start', 'stop')
 
-    def __init__(self, index):
+    def __init__(self, index: slice):
         if isinstance(index, slice):
             self.start = index.start
             self.stop = index.stop
@@ -187,24 +201,40 @@ class Window(object):
         return slice(self.start, self.stop)
 
     @property
-    def start_as_int(self):
+    def start_as_int(self) -> int:
         try:
             return int(self.start)
         except TypeError:
             return 0
 
     @property
-    def size(self):
+    def size(self) -> int:
         return self.stop - self.start_as_int
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((self.start, self.stop))
 
 
-class Query(object):
-    """Will gather all query related data (queried field, ordering, distinct, etc.)
-    and be passed to the manager"""
-    def __init__(self, action, filters=None, window=None, orderings=[], **hints):
+Q = TypeVar('Q', bound='Query')
+
+
+class Query:
+    """Gathers all query props (fields, ordering, distinct, etc.) to be executed by the manager"""
+
+    action: str
+    filters: QueryNodeWrapper | QueryNode | None
+    orderings: tuple[Ordering]
+    window: Window | None
+    hints: dict[str, Any]
+
+    def __init__(
+        self,
+        action: str,
+        filters: QueryNodeWrapper | QueryNode | None = None,
+        window: Window | None = None,
+        orderings: Iterable[Ordering] | None = None,
+        **hints,
+    ):
         self.action = action
         """The query action, a string, such as "select", "count", "insert"..."""
 
@@ -212,7 +242,7 @@ class Query(object):
         """A :py:class:`QueryNodeWrapper` or :py:class:`QueryNode` instance
         representing additional filters on the query"""
 
-        self.orderings = orderings
+        self.orderings = tuple(orderings or ())
         """An iterable of :py:class:`Ordering` instances to apply a custom ordering to the
         result set"""
 
@@ -221,7 +251,7 @@ class Query(object):
 
         self.hints = hints
 
-    def clone(self, **kwargs):
+    def clone(self: Q, **overrides) -> Q:
         base_kwargs = {
             'orderings': self.orderings,
             'action': self.action,
@@ -229,21 +259,21 @@ class Query(object):
         if self.filters:
             base_kwargs['filters'] = self.filters.clone()
         base_kwargs.update(**self.hints)
-        base_kwargs.update(**kwargs)
+        base_kwargs.update(**overrides)
 
         return self.__class__(**base_kwargs)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((
             self.filters,
-            tuple(self.orderings),
+            self.orderings,
             self.action,
             self.window,
             tuple(sorted(self.hints.items()))
         ))
 
 
-class QuerySet(object):
+class QuerySet:
     def __init__(self, manager, model, query=None, orderings=None, distinct=False):
         self.model = model
         self.manager = manager
@@ -260,7 +290,6 @@ class QuerySet(object):
         if len(self.data) > REPR_OUTPUT_SIZE:
             suffix = " ...(remaining elements truncated)..."
         return '<QuerySet {0}{1}>'.format(self.data[:REPR_OUTPUT_SIZE], suffix)
-
 
     @property
     def data(self):
@@ -442,7 +471,12 @@ class QuerySet(object):
         if kwargs.get('flat', False) and len(paths) > 1:
             raise ValueError('You cannot set flat to True if you want to return multiple values')
 
-        query = self.query.clone(action='values', paths=paths, mode='iterable', flat=kwargs.get('flat'))
+        query = self.query.clone(
+            action='values',
+            paths=paths,
+            mode='iterable',
+            flat=kwargs.get('flat')
+            )
         return self.manager.execute(query)
 
     def _get_aggregate_key(self, aggregation, function_name, key=None):
@@ -516,7 +550,6 @@ class QuerySet(object):
         """
 
         from .backends import python
-        from . import models
 
         store = python.IterableStore(values=self)
         return store.query(self.manager.model).all()

@@ -20,7 +20,7 @@ Such collections must contain similarly structured objects in order for lifter t
     ]
 
     # okay
-    class User(object):
+    class User:
         def __init__(self, age, first_name, last_name):
             self.age = age
             self.first_name = first_name

@@ -109,7 +109,7 @@ class RESTStore(store.Store):
         return len(self.handle_select(query, model))
 
 
-class QueryStringBuilder(object):
+class QueryStringBuilder:
     """
     Will build the correct querystring from a given query node
     """

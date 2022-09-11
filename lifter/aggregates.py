@@ -1,8 +1,10 @@
-from . import utils
+class Aggregate:
+    __slots__ = ('attr_name',)
 
+    attr_name: str
+    name: str = None
 
-class Aggregate(object):
-    def __init__(self, attr_name, **kwargs):
+    def __init__(self, attr_name: str, **kwargs):
         self.attr_name = attr_name
 
     @property
@@ -13,8 +15,9 @@ class Aggregate(object):
         raise NotImplementedError
 
     def __hash__(self):
-        return hash((self.attr_name,))
-        
+        return hash(self.attr_name)
+
+
 class Sum(Aggregate):
     name = 'sum'
 
@@ -28,14 +31,16 @@ class Min(Aggregate):
     def aggregate(self, values):
         return min(values)
 
+
 class Max(Aggregate):
     name = 'max'
 
     def aggregate(self, values):
         return max(values)
 
+
 class Avg(Aggregate):
     name = 'avg'
 
     def aggregate(self, values):
-        return float(sum(values)) / len(values)
+        return sum(values) / len(values)

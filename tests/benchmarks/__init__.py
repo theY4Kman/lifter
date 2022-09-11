@@ -1,21 +1,21 @@
-import collections
-
 import lifter
 
 from .utils import Benchmark, report
 
-benchmarks = collections.OrderedDict()
+benchmarks = {}
+
 
 def register(cls):
     benchmarks[cls.code] = cls()
     return cls
+
 
 @register
 class SingleFilterBenchmark(Benchmark):
     code = 'single_filter'
 
     def vanilla_version(self, setup_data):
-        return len([row for row in setup_data['test_data'] if row["age"] == 42])
+        return sum(1 for row in setup_data['test_data'] if row["age"] == 42)
 
     def lifter_version(self, setup_data):
         manager = lifter.load(setup_data['test_data'])
@@ -27,7 +27,7 @@ class CombinedFilterBenchmark(Benchmark):
     code = 'combined_filter'
 
     def vanilla_version(self, setup_data):
-        return len([row for row in setup_data['test_data'] if row["age"] == 42 and row['is_active']])
+        return sum(1 for row in setup_data['test_data'] if row["age"] == 42 and row['is_active'])
 
     def lifter_version(self, setup_data):
         manager = lifter.load(setup_data['test_data'])

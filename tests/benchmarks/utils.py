@@ -3,7 +3,7 @@ import time
 from .big_fake_data import fake;
 
 
-class Benchmark(object):
+class Benchmark:
     label = None
     loops = 100
 

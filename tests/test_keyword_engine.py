@@ -19,7 +19,7 @@ import lifter.lookups
 from lifter.backends.python import IterableStore
 
 
-class TObject(object):
+class TObject:
     def __init__(self, name, **kwargs):
         self.name = name
         for key, value in kwargs.items():

@@ -10,7 +10,7 @@ registry = Lookups()
 register = registry.register
 
 
-class BaseLookup(object):
+class BaseLookup:
     def __call__(self, value):
         return self.lookup(value)
 

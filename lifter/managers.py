@@ -1,5 +1,5 @@
 
-class Manager(object):
+class Manager:
     """Used to retrieve / order / filter preferences pretty much as django's ORM managers"""
     queryset_class = None
 

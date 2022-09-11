@@ -25,7 +25,7 @@ from random import randrange
 # log rotation
 
 
-class switch(object):
+class switch:
     def __init__(self, value):
         self.value = value
         self.fall = False

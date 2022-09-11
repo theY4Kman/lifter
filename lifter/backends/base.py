@@ -5,7 +5,7 @@ from .. import query
 from ..fields import Field
 
 
-class Meta(object):
+class Meta:
     """Much like django Model.Meta"""
     def __init__(self, fields, name, name_plural=None, app_name=None):
         self.fields = fields

@@ -1,58 +1,71 @@
 """
 Cache yo.
 """
+from __future__ import annotations
+
 import datetime
+from typing import Any, Callable, Generic, TypeVar
 
 from . import exceptions
 
-class NotSet(object):
+
+class NotSet:
     pass
 
 
-class Enable(object):
-    def __init__(self, cache, new_value):
+CacheT = TypeVar('CacheT', bound='Cache')
+
+
+class CacheToggler(Generic[CacheT]):
+    def __init__(self, cache: CacheT, new_value: bool):
         self.cache = cache
         self.new_value = new_value
         self.previous_value = self.cache.enabled
 
-    def __enter__(self):
+    def __enter__(self) -> CacheT:
         self.cache.enabled = self.new_value
+        return self.cache
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, exc_type, exc_value, exc_tb):
         self.cache.enabled = self.previous_value
 
 
-class Cache(object):
-    def __init__(self, default_timeout=None, enabled=True):
+V = TypeVar('V')
+
+
+class Cache:
+    def __init__(self, default_timeout: float | None = None, enabled: bool = True):
         self.default_timeout = default_timeout
         self.enabled = enabled
 
-    def get(self, key, default=None, reraise=False):
+    def get(self, key: str, default: V = None, reraise: bool = False) -> Any | V:
         """
         Get the given key from the cache, if present.
         A default value can be provided in case the requested key is not present,
         otherwise, None will be returned.
 
         :param key: the key to query
-        :type key: str
         :param default: the value to return if the key does not exist in cache
-        :param reraise: wether an exception should be thrown if now value is found, defaults to False.
-        :type key: bool
+        :param reraise: whether an exception should be thrown if value not found (default: False)
 
         Example usage:
 
         .. code-block:: python
-        
-            cache.set('my_key', 'my_value')
 
-            cache.get('my_key')
-            >>> 'my_value'
+            >>> cache = DummyCache()
 
-            cache.get('not_present', 'default_value')
-            >>> 'default_value'
+            >>> cache.set('my_key', 'my_value')
+            'my_value'
+            >>> cache.get('my_key')
+            'my_value'
 
-            cache.get('not_present', reraise=True)
-            >>> raise lifter.exceptions.NotInCache
+            >>> cache.get('not_present', 'default_value')
+            'default_value'
+
+            >>> cache.get('not_present', reraise=True)
+            Traceback (most recent call last):
+              ...
+            lifter.exceptions.NotInCache: 'not_present'
 
         """
         if not self.enabled:
@@ -67,17 +80,15 @@ class Cache(object):
                 raise
             return default
 
-    def set(self, key, value, timeout=NotSet):
+    def set(self, key: str, value: V | Callable[[], V], timeout=NotSet) -> V:
         """
         Set the given key to the given value in the cache.
         A timeout may be provided, otherwise, the :py:attr:`Cache.default_timeout`
         will be used.
 
         :param key: the key to which the value will be bound
-        :type key: str
         :param value: the value to store in the cache
         :param timeout: the expiration delay for the value. None means it will never expire.
-        :type timeout: integer or None
 
         Example usage:
 
@@ -85,24 +96,26 @@ class Cache(object):
 
             # this cached value will expire after half an hour
             cache.set('my_key', 'value', 1800)
+
         """
         if not self.enabled:
-            return
+            return False
 
-        if hasattr(value, '__call__'):
+        if callable(value):
             value = value()
         if timeout == NotSet:
             timeout = self.default_timeout
+
         self._set(key, value, timeout)
         return value
 
-    def get_or_set(self, key, value):
+    def get_or_set(self, key: str, value: V) -> Any | V:
         try:
             return self.get(key, reraise=True)
         except exceptions.NotInCache:
             return self.set(key, value)
 
-    def enable(self):
+    def enable(self) -> CacheToggler:
         """
         Returns a context manager to force enabling the cache if it is disabled:
 
@@ -111,9 +124,9 @@ class Cache(object):
             with cache.enable():
                 manager.count()
         """
-        return Enable(self, True)
+        return CacheToggler(self, True)
 
-    def disable(self):
+    def disable(self) -> CacheToggler:
         """
         Returns a context manager to bypass the cache:
 
@@ -123,33 +136,36 @@ class Cache(object):
                 # Will ignore the cache
                 manager.count()
         """
-        return Enable(self, False)
-
+        return CacheToggler(self, False)
 
     def get_now(self):
+        """Return current time
+
+        This method is mocked during testing.
+        """
         return datetime.datetime.now()
 
-    def _get(self, key):
-        raise NotImplementedError()
+    def _get(self, key: str) -> Any:
+        raise NotImplementedError
 
-    def _set(self, key, value, timeout=None):
-        raise NotImplementedError()
-
+    def _set(self, key: str, value, timeout=None) -> bool:
+        raise NotImplementedError
 
 
 class DummyCache(Cache):
     def __init__(self, *args, **kwargs):
         self._data = {}
-        super(DummyCache, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
-    def _set(self, key, value, timeout=None):
+    def _set(self, key: str, value: Any, timeout: float | None = None) -> bool:
         if timeout is not None:
             expires_on = self.get_now() + datetime.timedelta(seconds=timeout)
         else:
             expires_on = None
         self._data[key] = (expires_on, value)
+        return True
 
-    def _get(self, key):
+    def _get(self, key: str) -> Any:
         try:
             expires_on, value = self._data[key]
         except KeyError:

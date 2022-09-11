@@ -37,7 +37,7 @@ def cast_to_values(query, results):
     return IterableStore(values).query(models.Model).all()
 
 
-class Store(object):
+class Store:
     """
     A place to look for data (python iterable, database, rest api...)
 

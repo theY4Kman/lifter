@@ -1,11 +1,12 @@
 import re
 import operator
 import collections
+from collections.abc import Iterable
 
 from . import exceptions
 
 
-class IterableAttr(object):
+class IterableAttr:
 
     def __init__(self, iterable, key):
         self._getter = attrgetter(key)
@@ -78,7 +79,7 @@ def resolve_attr(obj, name):
         pass
 
     # Last possible choice, it's an iterable
-    if isinstance(obj, collections.Iterable):
+    if isinstance(obj, Iterable):
         return IterableAttr(obj, name)
 
     raise exceptions.MissingField('Object {0} has no attribute or key "{1}"'.format(obj, name))

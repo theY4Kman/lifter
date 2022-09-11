@@ -1,13 +1,4 @@
-import operator
-
-from . import base
-from .. import query
-from .. import models
-from .. import store
-from .. import exceptions
-from .. import lookups
-from .. import utils
-from .. import managers
+from .. import exceptions, managers, store, utils
 
 
 def get_wrapper(query, hints):
@@ -29,7 +20,7 @@ def get_wrapper(query, hints):
     return wrapper
 
 
-class QueryImpl(object):
+class QueryImpl:
 
     def __init__(self, base_query, hints):
         self.base_query = base_query
